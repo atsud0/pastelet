@@ -1,0 +1,141 @@
+name: CI and container release
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_VERSION: 1.99.1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt --component clippy
+          rustup override set "$RUST_VERSION"
+      - name: Rust validation
+        run: |
+          cargo fmt --all -- --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+      - name: UI and generated CSS validation
+        run: |
+          node --test tests/*_ui.cjs
+          sh scripts/build-css.sh --check
+      - name: Compose validation
+        run: docker compose config --quiet
+
+  images:
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v')) }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - name: Build native image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          build-args: RUST_VERSION=${{ env.RUST_VERSION }}
+          load: true
+          push: false
+          tags: rpaste:ci
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=rpaste-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rpaste-${{ matrix.arch }}
+      - name: Smoke test native image
+        run: bash scripts/test-container.sh rpaste:ci
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push tested architecture image
+        if: env.PUBLISH == 'true'
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${ARCH}"
+          docker tag rpaste:ci "$image:$tag"
+          docker push "$image:$tag"
+
+  publish:
+    needs: images
+    if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge and verify multi-platform manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags=(--tag "$image:sha-$GITHUB_SHA")
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || (( ${#GITHUB_REF_NAME} > 127 )); then
+              echo 'Release tags must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease' >&2
+              exit 1
+            fi
+            tags+=(--tag "$image:$GITHUB_REF_NAME")
+            if [[ "$GITHUB_REF_NAME" != *-* ]]; then
+              tags+=(--tag "$image:latest")
+            fi
+          else
+            tags+=(--tag "$image:edge")
+          fi
+          source="build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker buildx imagetools create "${tags[@]}" "$image:$source-amd64" "$image:$source-arm64"
+          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" --raw \
+            | jq -e '[.manifests[].platform | .os + "/" + .architecture] | sort == ["linux/amd64", "linux/arm64"]'
+          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

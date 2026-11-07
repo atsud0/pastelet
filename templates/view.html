@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · rpaste{% endblock %}
+{% block extra_scripts %}{% if is_pdf %}<script src="/static/pdf-viewer.mjs" type="module"></script>{% endif %}{% endblock %}
+{% block toolbar_class %}reader-toolbar{% endblock %}
+{% block toolbar_title %}<h1 title="{{ title }}">{{ title }}</h1>{% endblock %}
+{% block toolbar_actions %}
+  <div id="reader-tools" class="reader-tools">
+    <button id="reader-menu-toggle" class="icon-button" type="button" aria-label="更多操作" title="更多操作" aria-expanded="false" aria-controls="reader-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+    <nav id="reader-menu" class="reader-menu actions" aria-label="Paste" hidden>
+    {% if is_markdown %}
+    <button id="view-toggle" type="button" aria-label="Source" title="Source" aria-pressed="false" aria-controls="rpaste-source rpaste-rendered">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/></svg>
+    </button>
+    {% endif %}
+    {% if !is_pdf %}<button class="reader-copy" id="copy-paste" type="button" aria-label="Copy" title="Copy" data-raw="{{ raw_base64 }}" data-burned="{{ burned }}" data-id="{{ id }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>
+    </button>
+    <a href="/raw/{{ id }}" aria-label="Raw" title="Raw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5m-5 4h5"/></svg></a>
+    {% endif %}
+    <a class="reader-download" href="/download/{{ id }}" data-filename="{{ download_name }}" aria-label="Download" title="Download"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></a>
+    {% if !is_pdf %}
+    {% if burned %}
+    <button type="submit" form="burned-fork" aria-label="Fork" title="Fork"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10m12-10v2c0 3-12 3-12 6"/></svg></button>
+    {% else %}
+    <a href="/fork/{{ id }}" aria-label="Fork" title="Fork"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10m12-10v2c0 3-12 3-12 6"/></svg></a>
+    {% endif %}
+    {% endif %}
+    <div class="reader-theme">{% include "theme.html" %}</div>
+    </nav>
+  </div>
+{% endblock %}
+{% block content %}
+{% if burned && !is_pdf %}
+<form id="burned-fork" action="/fork" method="post" hidden>
+  <input name="title" value="{{ title }}">
+  <input name="language" value="{{ language }}">
+  <textarea name="content">
+{{ content }}</textarea>
+</form>
+{% endif %}
+{% if is_pdf %}
+<section id="pdf-viewer" class="pdf-viewer" data-pdf="{{ pdf_base64 }}" data-burned="{{ burned }}" data-filename="{{ download_name }}" aria-label="PDF">
+  <p id="pdf-status" role="status" aria-live="polite">正在加载 PDF…</p>
+  <div id="pdf-scroll" class="pdf-scroll" tabindex="0" role="region" aria-label="PDF 连续阅读"><div id="pdf-pages" class="pdf-pages"></div></div>
+  <nav class="pdf-pager" aria-label="PDF 阅读控制">
+    <button id="pdf-previous" class="icon-button" type="button" aria-label="上一页" title="上一页" disabled>‹</button>
+    <label><span class="sr-only">页码</span><input id="pdf-page" type="number" min="1" value="1" aria-label="页码" disabled></label><span id="pdf-total">/ —</span>
+    <button id="pdf-next" class="icon-button" type="button" aria-label="下一页" title="下一页" disabled>›</button>
+    <button id="pdf-zoom-out" class="icon-button" type="button" aria-label="缩小" title="缩小" disabled>−</button>
+    <button id="pdf-zoom-in" class="icon-button" type="button" aria-label="放大" title="放大" disabled>+</button>
+  </nav>
+</section>
+{% else %}
+{% if is_markdown %}
+<article id="rpaste-rendered" class="markdown editor-card" hx-disable>{{ markdown_html|safe }}</article>
+{% endif %}
+<section id="rpaste-source" class="reader-source" aria-label="{{ language }}"{% if is_markdown %} hidden{% endif %} hx-disable>
+  {{ source_html|safe }}
+  <label class="reader-wrap"><input id="reader-wrap" type="checkbox" role="switch" aria-label="换行" aria-controls="rpaste-source"{% if language == "text" %} checked{% endif %}>换行</label>
+</section>
+<p id="action-feedback" class="sr-only" role="status" aria-live="polite"></p>
+{% endif %}
+{% endblock %}

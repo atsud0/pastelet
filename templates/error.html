@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} · rpaste{% endblock %}
+{% block header %}{% endblock %}
+{% block main_class %}error-main{% endblock %}
+{% block content %}
+<div class="flex min-h-[calc(100svh-1.5rem)] flex-col items-center justify-center text-center">
+  <div class="state-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 3v1"/></svg></div>
+  <h1 class="mb-8 text-2xl font-semibold">{{ label }}</h1>
+  <a class="primary" href="/">Home</a>
+</div>
+{% endblock %}

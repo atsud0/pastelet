@@ -1,0 +1,36 @@
+services:
+  rpaste:
+    image: ${RPASTE_IMAGE:-rpaste:local}
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "${HOST_IP:-127.0.0.1}:${HOST_PORT:-3000}:3000"
+    environment:
+      BIND_ADDR: 0.0.0.0:3000
+      DATABASE_URL: sqlite:///data/rpaste.db
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      MAX_CONTENT_BYTES: ${MAX_CONTENT_BYTES:-1048576}
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-5}
+      CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-60}
+      API_TOKEN: ${API_TOKEN:-}
+      RUST_LOG: ${RUST_LOG:-rpaste=info,tower_http=info}
+    volumes:
+      - rpaste-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  rpaste-data:

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"selfRequestsOnly":true,"historyCacheSize":0,"historyRestoreAsHxRequest":false,"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}'>
+  <title>{% block title %}rpaste{% endblock %}</title>
+  <link rel="stylesheet" href="/static/syntax.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js"></script>
+  <script src="/static/pdf-editor.js" defer></script>
+  <script src="/static/editor.js" defer></script>
+  <script src="/static/htmx.min.js" defer></script>
+  {% block extra_scripts %}{% endblock %}
+</head>
+<body hx-history="false">
+  {% block body %}
+  {% block page_open %}{% endblock %}
+  {% block header %}
+  <header class="site-toolbar {% block toolbar_class %}{% endblock %}">
+    {% include "home.html" %}
+    {% block toolbar_content %}
+    <div class="toolbar-title">{% block toolbar_title %}{% endblock %}</div>
+    <div class="toolbar-actions">{% block toolbar_actions %}{% include "theme.html" %}{% endblock %}</div>
+    {% endblock %}
+  </header>
+  {% endblock %}
+  <main class="{% block main_class %}site-main{% endblock %}">{% block content %}{% endblock %}</main>
+  {% block page_close %}{% endblock %}
+  {% endblock %}
+</body>
+</html>

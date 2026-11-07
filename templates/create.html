@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block page_open %}
+<form id="create-paste" action="/paste" method="post" hx-post="/paste" hx-target="#form-feedback" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
+{% endblock %}
+{% block toolbar_class %}create-toolbar{% endblock %}
+{% block toolbar_content %}
+    <button id="upload-button" class="icon-button upload-button" type="button" aria-label="上传文件" title="上传文件" hidden><svg data-upload-icon viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-5 5 5-5 5 5M4 16v4h16v-4"/></svg><svg data-pdf-icon viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M6 2h8l4 4v16H6zM14 2v5h4"/><text x="7" y="16" font-size="5" fill="currentColor" stroke="none">PDF</text></svg></button>
+    <div id="pdf-file-menu" class="pdf-file-menu" hidden><button id="pdf-remove" class="control" type="button">移除文件</button></div>
+    <button id="settings-toggle" class="control settings-toggle" type="button" aria-expanded="false" aria-controls="create-settings">Settings</button>
+    <div id="create-settings" class="create-settings">
+    <div class="language-group">
+    <select class="control language-select" name="language" aria-label="Language">
+      {% for option in languages %}
+      <option value="{{ option.value }}"{% if option.value == language %} selected{% endif %}>{{ option.label }}</option>
+      {% endfor %}
+    </select>
+    </div>
+    <div class="options-group">
+    <select class="control" name="expires_in" aria-label="Expiration">
+      <option value="10m"{% if expires_in == "10m" %} selected{% endif %}>10 minutes</option>
+      <option value="1h"{% if expires_in == "1h" %} selected{% endif %}>1 hour</option>
+      <option value="1d"{% if expires_in == "1d" %} selected{% endif %}>1 day</option>
+      <option value="1w"{% if expires_in == "1w" %} selected{% endif %}>1 week</option>
+      <option value="1m"{% if expires_in == "1m" %} selected{% endif %}>1 month</option>
+      <option value="never"{% if expires_in == "never" %} selected{% endif %}>Never</option>
+    </select>
+    <div class="advanced-options">
+    <button id="more-toggle" class="control more-toggle" type="button" aria-expanded="false" aria-controls="advanced-fields">More</button>
+    <div id="advanced-fields" class="advanced-fields">
+    <input class="control password-input" name="password" type="password" placeholder="Password" aria-label="Password" autocomplete="new-password" maxlength="1024">
+    <label class="inline-flex h-10 cursor-pointer items-center gap-2 text-sm text-muted">
+      <input class="burn-checkbox" name="burn_after_read" type="checkbox" role="switch" aria-label="Burn" value="true"{% if burn_after_read %} checked{% endif %}>Burn
+      <span data-tooltip="Deleted after viewing" tabindex="0" aria-label="Deleted after viewing"><svg class="size-4" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></svg></span>
+    </label>
+    </div>
+    </div>
+    </div>
+    <div class="toolbar-tools">
+    <div class="create-actions">
+      {% include "theme.html" %}
+      <button type="submit" class="primary create-submit desktop-submit" aria-keyshortcuts="Control+Enter"><span>Create</span><svg class="submit-arrow size-4" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg><svg class="submit-spinner size-4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8"/></svg></button>
+    </div>
+    </div>
+    </div>
+{% endblock %}
+{% block main_class %}site-main create-workspace{% endblock %}
+{% block content %}
+    <div class="editor-card">
+      <input class="block h-16 w-full border-0 border-b border-line bg-transparent px-5 text-lg font-medium outline-none sm:px-7" name="title" value="{{ title }}" placeholder="Title" aria-label="Title" maxlength="200" autocomplete="off">
+      <div id="paste-editor" class="paste-editor">
+        <div id="editor-gutter" class="editor-gutter" aria-hidden="true" hidden></div>
+        <div class="editor-text">
+          <div id="editor-active-line" class="editor-active-line" aria-hidden="true" hidden></div>
+      <textarea id="paste-content" class="editor-input" name="content" placeholder="Paste" aria-label="Content" spellcheck="false" wrap="{% if language == "text" %}soft{% else %}off{% endif %}" required>
+{{ content }}</textarea>
+        </div>
+        <input id="upload-file" type="file" hidden data-max-pdf-bytes="{{ max_pdf_bytes }}">
+        <div id="upload-overlay" class="upload-overlay" aria-hidden="true" hidden>松手即可上传</div>
+      </div>
+    </div>
+    <dialog id="upload-notice" class="upload-dialog" aria-labelledby="upload-message" hidden>
+      <p id="upload-message" role="status" aria-live="polite" aria-atomic="true"></p>
+      <div id="upload-confirmation" class="upload-confirmation" hidden>
+        <button id="upload-replace" class="control" type="button">替换</button>
+        <button id="upload-cancel" class="control" type="button">取消</button>
+      </div>
+      <button id="upload-dismiss" class="control" type="button">确定</button>
+    </dialog>
+    <div id="form-feedback" role="status" aria-live="polite">{% if !error.is_empty() %}<p class="form-error">{{ error }}</p>{% endif %}</div>
+{% endblock %}
+{% block page_close %}
+  <div class="mobile-create">
+    <button type="submit" class="primary create-submit" aria-keyshortcuts="Control+Enter"><span>Create</span><svg class="submit-spinner size-4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8"/></svg></button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Locked · rpaste{% endblock %}
+{% block content %}
+<div class="flex min-h-[60vh] flex-col items-center justify-center">
+  <div class="state-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg></div>
+  <h1 class="mb-6 text-2xl font-semibold">Locked</h1>
+  <form class="flex w-full max-w-xs flex-col gap-3" action="/unlock/{{ id }}" method="post">
+    <input type="hidden" name="target" value="{{ target }}">
+    <input class="control" name="password" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" maxlength="1024" required autofocus>
+    <button class="primary" type="submit">Unlock</button>
+    {% if !error.is_empty() %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+  </form>
+</div>
+{% endblock %}

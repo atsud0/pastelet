@@ -157,7 +157,7 @@ class PastePdfAttachment {
     request.addEventListener("load", () => {
       let result;
       try { result = JSON.parse(request.responseText); } catch {}
-      if (request.status === 201 && /^\/[A-Za-z0-9]{8}$/.test(result?.url)) {
+      if (request.status === 201 && /^\/(?:[A-Za-z0-9]{8}|[A-Za-z0-9]{22})$/.test(result?.url)) {
         progress("100%");
         this.window.location.assign(result.url);
         return;

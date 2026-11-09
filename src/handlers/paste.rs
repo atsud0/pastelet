@@ -334,7 +334,10 @@ pub async fn unlock(
     }
     let token = access::issue(&state, &metadata, "access").await?;
     Ok((
-        [(header::SET_COOKIE, access::cookie(&state, &id, &token))],
+        [(
+            header::SET_COOKIE,
+            access::cookie(&state, &id, &token, &headers)?,
+        )],
         Redirect::to(&input.target.path(&id)),
     )
         .into_response())

@@ -45,16 +45,23 @@ pub fn cookie_name(id: &str) -> String {
     format!("rpaste_access_{id}")
 }
 
-pub fn cookie(state: &AppState, id: &str, token: &str) -> String {
-    let secure = if state.config.base_url.starts_with("https://") {
+pub fn cookie(
+    state: &AppState,
+    id: &str,
+    token: &str,
+    headers: &HeaderMap,
+) -> Result<String, AppError> {
+    same_origin(state, headers)?;
+    let origin = request_origin(headers)?.unwrap_or_else(|| state.config.base_url.clone());
+    let secure = if origin.starts_with("https://") {
         "; Secure"
     } else {
         ""
     };
-    format!(
+    Ok(format!(
         "{}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={ACCESS_SECONDS}{secure}",
         cookie_name(id)
-    )
+    ))
 }
 
 pub async fn authorized(
@@ -103,16 +110,27 @@ pub fn same_origin(state: &AppState, headers: &HeaderMap) -> Result<(), AppError
     {
         return Err(AppError::BadRequest("Cross-site request rejected"));
     }
-    if let Some(origin) = headers.get(header::ORIGIN) {
-        let origin = origin
-            .to_str()
-            .ok()
-            .and_then(|value| url::Url::parse(value).ok());
-        let expected = url::Url::parse(&state.config.base_url)
-            .map_err(|_| AppError::Internal("invalid base URL"))?;
-        if origin.is_none_or(|origin| origin.origin() != expected.origin()) {
-            return Err(AppError::BadRequest("Cross-site request rejected"));
-        }
+    if let Some(origin) = request_origin(headers)?
+        && origin != state.config.base_url
+        && !state.config.allowed_origins.contains(&origin)
+    {
+        return Err(AppError::BadRequest("Cross-site request rejected"));
     }
     Ok(())
+}
+
+fn request_origin(headers: &HeaderMap) -> Result<Option<String>, AppError> {
+    let mut origins = headers.get_all(header::ORIGIN).iter();
+    let Some(value) = origins.next() else {
+        return Ok(None);
+    };
+    if origins.next().is_some() {
+        return Err(AppError::BadRequest("Cross-site request rejected"));
+    }
+    let value = value
+        .to_str()
+        .map_err(|_| AppError::BadRequest("Cross-site request rejected"))?;
+    crate::config::normalize_origin(value, "Origin")
+        .map(Some)
+        .map_err(|_| AppError::BadRequest("Cross-site request rejected"))
 }

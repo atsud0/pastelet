@@ -155,3 +155,15 @@ test("PDF submit intercepts HTMX, success redirects only to a local paste ID", a
   pdf.upload(); requests[1].status = 201; requests[1].responseText = '{"url":"/Ab12Cd34"}'; requests[1].listeners.load();
   assert.deepEqual(locations, ["/Ab12Cd34"]);
 });
+
+test("PDF redirect accepts new and legacy IDs but rejects other lengths and nonlocal URLs", async () => {
+  for (const id of ["Ab12Cd34", "Ab12Cd34Ef56Gh78Ij90Kl", "a".repeat(21), "a".repeat(23), "a".repeat(9), "Ab12Cd34Ef56Gh78Ij90K-", "/evil.example", "Ab12Cd34?next=evil"]) {
+    const { pdf, requests, locations } = harness();
+    await pdf.attach(file(), "", () => true);
+    pdf.upload();
+    requests[0].status = 201;
+    requests[0].responseText = JSON.stringify({ url: `/${id}` });
+    requests[0].listeners.load();
+    assert.deepEqual(locations, ["Ab12Cd34", "Ab12Cd34Ef56Gh78Ij90Kl"].includes(id) ? [`/${id}`] : []);
+  }
+});

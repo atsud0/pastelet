@@ -30,6 +30,7 @@ impl Harness {
             bind_addr: "127.0.0.1:0".parse().expect("address"),
             database_url,
             base_url: "https://paste.example".into(),
+            allowed_origins: Vec::new(),
             max_content_bytes: limit,
             database_max_connections: connections,
             cleanup_interval: Duration::from_secs(60),
@@ -130,6 +131,7 @@ async fn json_round_trip_defaults_links_and_exact_public_fields() {
     let created = body(response).await;
     let id = created["id"].as_str().expect("id");
     assert!(paste::valid_id(id));
+    assert_eq!(id.len(), 22);
     assert_eq!(created.as_object().expect("object").len(), 4);
     assert_eq!(created["url"], format!("https://paste.example/{id}"));
     assert_eq!(created["url"], location);
@@ -162,6 +164,7 @@ async fn plain_text_preserves_bytes_and_parses_all_query_options() {
     let created = body(response).await;
     assert_eq!(created["expires_at"], Value::Null);
     let id = created["id"].as_str().expect("id");
+    assert_eq!(id.len(), 22);
     let read = body(harness.read(id, &[("x-paste-password", "demo+pass")]).await).await;
     assert_eq!(read["content"], content);
     assert_eq!(read["title"], "Hello world");

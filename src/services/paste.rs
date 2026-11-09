@@ -7,6 +7,8 @@ use super::{access, compute, expiration::Expiration, language, password};
 use crate::{AppState, db, error::AppError, models::Paste};
 
 const ALPHABET: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+pub const ID_LENGTH: usize = 22;
+const LEGACY_ID_LENGTH: usize = 8;
 const ID_ATTEMPTS: usize = 5;
 
 #[derive(Clone, Deserialize)]
@@ -22,19 +24,20 @@ pub struct CreatePaste {
 }
 
 pub fn valid_id(id: &str) -> bool {
-    id.len() == 8 && id.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    matches!(id.len(), LEGACY_ID_LENGTH | ID_LENGTH)
+        && id.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }
 
 pub fn random_id() -> Result<String, AppError> {
-    let mut result = String::with_capacity(8);
-    while result.len() < 8 {
+    let mut result = String::with_capacity(ID_LENGTH);
+    while result.len() < ID_LENGTH {
         let mut random = [0_u8; 16];
         getrandom::fill(&mut random)
             .map_err(|_| AppError::Internal("OS randomness unavailable"))?;
         for byte in random {
             if byte < 248 {
                 result.push(char::from(ALPHABET[usize::from(byte % 62)]));
-                if result.len() == 8 {
+                if result.len() == ID_LENGTH {
                     break;
                 }
             }
@@ -196,12 +199,18 @@ mod tests {
     }
 
     #[test]
-    fn ids_are_eight_ascii_base62_characters() {
+    fn new_ids_are_22_ascii_base62_characters_and_legacy_ids_remain_valid() {
         let mut seen = std::collections::HashSet::new();
         for _ in 0..1000 {
             let id = random_id().expect("OS random source");
+            assert_eq!(id.len(), ID_LENGTH);
             assert!(valid_id(&id));
             assert!(seen.insert(id));
+        }
+        assert!(valid_id("Ab12Cd34"));
+        assert!(valid_id("Ab12Cd34Ef56Gh78Ij90Kl"));
+        for length in 0..=30 {
+            assert_eq!(valid_id(&"a".repeat(length)), matches!(length, 8 | 22));
         }
         for invalid in [
             "",
@@ -210,6 +219,7 @@ mod tests {
             "abcd-123",
             "../../ab",
             "中文abcd",
+            "Ab12Cd34Ef56Gh78Ij90K-",
         ] {
             assert!(!valid_id(invalid));
         }

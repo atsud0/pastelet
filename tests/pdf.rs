@@ -29,6 +29,7 @@ impl Harness {
             bind_addr: "127.0.0.1:0".parse().expect("address"),
             database_url,
             base_url: "https://paste.example".into(),
+            allowed_origins: Vec::new(),
             max_content_bytes: 1024 * 1024,
             database_max_connections: connections,
             cleanup_interval: Duration::from_secs(60),
@@ -85,7 +86,9 @@ impl Harness {
         assert_eq!(response.status(), StatusCode::CREATED);
         let value: serde_json::Value =
             serde_json::from_slice(&bytes(response).await).expect("JSON");
-        value["id"].as_str().expect("id").into()
+        let id = value["id"].as_str().expect("id");
+        assert_eq!(id.len(), 22);
+        id.into()
     }
     async fn get(&self, path: &str, cookie: &str, html: bool) -> Response {
         self.request(

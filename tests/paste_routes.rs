@@ -22,6 +22,7 @@ impl Harness {
             bind_addr: "127.0.0.1:0".parse().expect("address"),
             database_url: "sqlite::memory:".into(),
             base_url: "http://localhost:3000".into(),
+            allowed_origins: Vec::new(),
             max_content_bytes: limit,
             database_max_connections: 1,
             cleanup_interval: Duration::from_secs(60),
@@ -85,6 +86,7 @@ impl Harness {
         let location = response.headers()["location"].to_str().expect("location");
         let id = location.strip_prefix('/').expect("local redirect");
         assert!(valid_id(id));
+        assert_eq!(id.len(), 22);
         id.to_owned()
     }
 

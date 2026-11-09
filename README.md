@@ -47,7 +47,8 @@ cargo run --locked
 | --- | --- | --- |
 | `BIND_ADDR` | `127.0.0.1:3000` | IP 与端口；容器或远程访问需显式设置 `0.0.0.0:3000` |
 | `DATABASE_URL` | `sqlite://data/rpaste.db` | SQLite URL；自动创建缺失的父目录 |
-| `BASE_URL` | `http://localhost:3000` | 对外 HTTP(S) origin；用于解锁/确认的来源校验和 Secure Cookie 判定，必须与浏览器访问地址一致；不允许路径、凭据、query、fragment |
+| `BASE_URL` | `http://localhost:3000` | 默认分享地址的 HTTP(S) origin，自动加入允许来源；不允许路径、凭据、query、fragment |
+| `ALLOWED_ORIGINS` | 空 | 额外允许访问的完整 origin，以逗号分隔，含协议和非默认端口；用于解锁、焚毁确认及 PDF 上传的来源校验；不支持通配符 |
 | `MAX_CONTENT_BYTES` | `1048576` | UTF-8 原始内容字节上限，表单和 API 创建均实施 |
 | `DATABASE_MAX_CONNECTIONS` | `5` | 连接池上限，正整数 |
 | `CLEANUP_INTERVAL_SECONDS` | `60` | 定时清理间隔；启动后立即清理一次，随后定时清理 |
@@ -58,9 +59,11 @@ cargo run --locked
 
 ## 数据模型
 
-`migrations/0001_create_pastes.sql` 创建 STRICT 表 `pastes`：8 位 base62 主键、可空标题（最多 200 个字符）、原始内容、语言、可空密码哈希、阅后即焚标记、创建/过期时间。时间统一为 UTC Unix 秒，`expires_at = NULL` 表示永不过期；`expires_at <= now` 即过期。过期时间有部分索引，供后续清理使用。
+`migrations/0001_create_pastes.sql` 创建 STRICT 表 `pastes`，`0004_expand_paste_ids.sql` 将主键约束升级为支持 8 位旧 ID 和 22 位新 Base62 ID。其他字段为可空标题（最多 200 个字符）、原始内容、语言、可空密码哈希、阅后即焚标记、创建/过期时间。时间统一为 UTC Unix 秒，`expires_at = NULL` 表示永不过期；`expires_at <= now` 即过期。过期时间有部分索引，供后续清理使用。
 
-ID 使用操作系统安全随机源和拒绝采样，生成无模偏差的 8 位 base62 字符串。插入时以主键唯一约束处理冲突，最多尝试 5 个 ID，绝不覆盖旧内容。`password_hash` 保存带独立随机盐的 Argon2id PHC 编码哈希，不存储明文密码。存储模型不实现 Serialize 或 Debug，避免直接序列化密码哈希和意外输出内容。内容大小由配置决定，因此不在迁移中写死 1 MiB。
+新 ID 使用操作系统安全随机源和拒绝采样，生成无模偏差的 **22 位 Base62** 字符串（`0–9 A–Z a–z`，约 131 bits 随机强度）。网页创建、fork 后创建、JSON / text/plain API 及 PDF 上传统一使用此长度。插入时以主键唯一约束处理冲突，最多尝试 5 个 ID，绝不覆盖旧内容。旧 8 位链接原样保留，查看、raw、下载、fork、密码解锁、阅后即焚和 API 读取继续支持；不接受其他长度。保留旧链接不会提高其原有的抗猜测强度，敏感旧内容应重新创建为新链接并使用密码和过期时间。`password_hash` 保存带独立随机盐的 Argon2id PHC 编码哈希，不存储明文密码。存储模型不实现 Serialize 或 Debug，避免直接序列化密码哈希和意外输出内容。内容大小由配置决定，因此不在迁移中写死 1 MiB。
+
+升级前备份完整 SQLite 数据卷并停止旧进程。启动时自动执行 `0004_expand_paste_ids.sql`，在事务中重建关联表，保留所有旧 ID、密码哈希、访问/确认凭证和 PDF 字节及存储名，恢复索引和外键级联删除。迁移失败回滚且服务不会启动；不要修改已经执行过的旧迁移文件。重建会临时复制表（包括 PDF BLOB），请预留额外磁盘及 WAL 空间。新版本产生 22 位 ID 后不要直接运行仅支持 8 位 ID 的旧程序，回滚需恢复升级前完整备份。
 
 `migrations/0002_paste_tokens.sql` 新增短期凭证表，仅存随机令牌的 SHA-256 摘要、paste ID、用途和到期时间。解锁凭证与确认凭证分开校验；删除 paste 时通过外键级联删除其凭证。升级会自动执行新迁移，无需删除原有数据库。
 
@@ -97,7 +100,7 @@ ID 使用操作系统安全随机源和拒绝采样，生成无模偏差的 8 �
 - ammonia 移除脚本、事件属性、危险 URL 和任意样式；任务列表输入被强制为禁用复选框，脚注 ID 使用 `md-` 前缀隔离应用 DOM。
 - 页面设置 CSP、`nosniff`、`Referrer-Policy: same-origin`、`no-store` 和禁止索引响应头；raw/下载额外设置 CSP sandbox。跨源链接和资源不发送 Referer，同源表单保留真实 Origin，避免普通 POST 在 `no-referrer` 策略下发送 `Origin: null` 而被来源校验拒绝；后端仍拒绝 null 或不匹配的 Origin。
 - 查看、raw、下载、fork 共用密码/过期检查，不存在、过期或已焚毁均为 `404`；清理任务删除过期记录及失效凭证。
-- 密码验证前只加载安全元数据，不返回正文或标题。网页解锁后使用 `HttpOnly; SameSite=Strict` Cookie；`BASE_URL` 为 HTTPS 时还设置 Secure。Cookie 按 paste 隔离，服务端有效期最长 1 小时且不超过 paste 到期时间。重启后仍可使用尚未到期的凭证，不涉及用户账号。
+- 密码验证前只加载安全元数据，不返回正文或标题。网页解锁后使用 `HttpOnly; SameSite=Strict`、不设置 Domain 的 Cookie；根据已通过白名单校验的请求 Origin 决定 Secure（HTTPS 设置，HTTP 不设置），无 Origin 的程序化请求回退到 BASE_URL 协议。不信任 X-Forwarded-Proto / Host 推断安全属性。Cookie 按访问主机和 paste 隔离，不会在公网域名和 Tailnet 主机名之间共享解锁状态；服务端有效期最长 1 小时且不超过 paste 到期时间。重启后仍可使用尚未到期的凭证，不涉及用户账号。
 - 阅后即焚的所有网页 GET / HEAD 入口均不烧毁，包括 raw、下载和 fork。浏览器先显示确认页，POST 时校验随机确认令牌（最长 10 分钟）、来源和密码授权。没有请求 HTML 的 GET 返回 `400 Confirmation required`，不能绕过确认页；缺密码仍优先返回 `401`。
 - 解锁和确认 POST 校验浏览器 Origin / Sec-Fetch-Site，确认令牌仅对指定 paste 和用途有效。密码只接受表单或 `X-Paste-Password` 请求头，不接受 URL 密码；不要把真实密码放入 shell 历史、公开命令或访问日志。
 - `API_TOKEN` 只保护 REST API 写入，不是网页创建密码；API 读取仍需满足 paste 自身的密码要求。
@@ -114,15 +117,15 @@ curl -i http://localhost:3000/paste \
   --data-urlencode 'expires_in=1h'
 ```
 
-响应为 `303`，`Location: /xxxxxxxx`。把实际 ID 代入以下路径：
+响应为 `303`，`Location: /Ab12Cd34Ef56Gh78Ij90Kl`。把实际 22 位 ID 代入以下路径：
 
 ```sh
-curl -i http://localhost:3000/xxxxxxxx
-curl http://localhost:3000/raw/xxxxxxxx
-curl -OJ http://localhost:3000/download/xxxxxxxx
+curl -i http://localhost:3000/Ab12Cd34Ef56Gh78Ij90Kl
+curl http://localhost:3000/raw/Ab12Cd34Ef56Gh78Ij90Kl
+curl -OJ http://localhost:3000/download/Ab12Cd34Ef56Gh78Ij90Kl
 ```
 
-浏览器访问 `/fork/xxxxxxxx` 应出现预填表单；只有再次点击 Create 才生成新记录。
+浏览器访问 `/fork/Ab12Cd34Ef56Gh78Ij90Kl` 应出现预填表单；只有再次点击 Create 才生成新记录。
 
 ## 测试
 
@@ -220,7 +223,7 @@ curl -i -H 'HX-Request: true' --data 'content=' http://localhost:3000/paste
 
 ### 运行与手动测试
 
-停止旧服务后启动新版本；新迁移保留原数据。若通过其他地址访问，请将 BASE_URL 改成实际 origin。公网部署应使用 HTTPS，TLS 终止和 Docker 配置见第 6 阶段。
+停止旧服务后启动新版本；新迁移保留原数据。若通过其他地址访问，将额外地址加入 ALLOWED_ORIGINS，或将 BASE_URL 改成新的主要 origin。公网部署应使用 HTTPS，TLS 终止和 Docker 配置见第 6 阶段。
 
 ```sh
 cargo run --locked
@@ -237,11 +240,11 @@ curl -i http://localhost:3000/paste \
   --data-urlencode 'expires_in=10m' \
   --data-urlencode 'burn_after_read=false'
 
-# 将 xxxxxxxx 换成响应 Location 中的 ID
-curl -i -c /tmp/rpaste-cookies.txt http://localhost:3000/unlock/xxxxxxxx \
+# 将示例 ID 换成响应 Location 中的实际 ID
+curl -i -c /tmp/rpaste-cookies.txt http://localhost:3000/unlock/Ab12Cd34Ef56Gh78Ij90Kl \
   --data-urlencode 'password=demo-only' --data-urlencode 'target=raw'
-curl -b /tmp/rpaste-cookies.txt http://localhost:3000/raw/xxxxxxxx
-curl -H 'X-Paste-Password: demo-only' http://localhost:3000/raw/xxxxxxxx
+curl -b /tmp/rpaste-cookies.txt http://localhost:3000/raw/Ab12Cd34Ef56Gh78Ij90Kl
+curl -H 'X-Paste-Password: demo-only' http://localhost:3000/raw/Ab12Cd34Ef56Gh78Ij90Kl
 rm -f /tmp/rpaste-cookies.txt
 ```
 
@@ -267,9 +270,9 @@ rm -f /tmp/rpaste-cookies.txt
 
 ```json
 {
-  "id": "Ab12Cd34",
-  "url": "http://localhost:3000/Ab12Cd34",
-  "raw_url": "http://localhost:3000/raw/Ab12Cd34",
+  "id": "Ab12Cd34Ef56Gh78Ij90Kl",
+  "url": "http://localhost:3000/Ab12Cd34Ef56Gh78Ij90Kl",
+  "raw_url": "http://localhost:3000/raw/Ab12Cd34Ef56Gh78Ij90Kl",
   "expires_at": 1794096000
 }
 ```
@@ -312,7 +315,7 @@ curl -i 'http://localhost:3000/api/paste?language=rs&title=My%20code&expires_in=
 
 ```json
 {
-  "id": "Ab12Cd34",
+  "id": "Ab12Cd34Ef56Gh78Ij90Kl",
   "title": "Example",
   "content": "fn main() {}\n",
   "language": "Rust",
@@ -325,8 +328,8 @@ curl -i 'http://localhost:3000/api/paste?language=rs&title=My%20code&expires_in=
 返回原文而不是 HTML，title / expires_at 可以为 null，密码哈希不返回。设置密码的 paste 必须使用 `X-Paste-Password`，缺失或错误返回 401。API 不接受网页解锁 Cookie 替代密码头；不存在、过期或已焚毁均为 404，且不透露是否曾设置密码。
 
 ```sh
-# 将 Ab12Cd34 替换为创建响应的实际 ID
-curl -i http://localhost:3000/api/paste/Ab12Cd34
+# 将 Ab12Cd34Ef56Gh78Ij90Kl 替换为创建响应的实际 ID
+curl -i http://localhost:3000/api/paste/Ab12Cd34Ef56Gh78Ij90Kl
 
 # 创建带密码且阅后即焚的测试内容
 curl -i http://localhost:3000/api/paste \
@@ -334,11 +337,11 @@ curl -i http://localhost:3000/api/paste \
   --data-binary '{"content":"Secret sample","password":"demo-only","expires_in":"10m","burn_after_read":true}'
 
 # 使用上一步新 ID；首次成功读取即删除，重试会得到 404
-curl -i http://localhost:3000/api/paste/Ab12Cd34 \
+curl -i http://localhost:3000/api/paste/Ab12Cd34Ef56Gh78Ij90Kl \
   -H 'X-Paste-Password: demo-only'
 
 # 普通非焚毁 paste 的原文入口同样接受密码头
-curl http://localhost:3000/raw/Ab12Cd34 -H 'X-Paste-Password: demo-only'
+curl http://localhost:3000/raw/Ab12Cd34Ef56Gh78Ij90Kl -H 'X-Paste-Password: demo-only'
 ```
 
 API 的 GET 是明确的程序化读取，阅后即焚内容没有网页确认步骤：先验证密码、准备 JSON，再通过带过期条件的原子 DELETE 争抢，只有删除成功的请求返回内容。并发读取最多一个成功；错误密码不会烧毁。网页链接的 GET 仍只展示确认页。API 不支持 HEAD（405，且不会焚毁）；不要使用读取接口做链接预览或健康探测。API 响应禁止缓存。
@@ -478,7 +481,25 @@ paste.example.com {
 
 这段配置以宿主机 Caddy 为前提；如果代理在另一个容器中，应接入同一 Docker 网络并转发至 `rpaste:3000`，不能把代理容器自己的 localhost 当作 rpaste。
 
-反向代理不要改写或删除 Origin / Referer，否则网页解锁或焚毁确认可能被拒绝。BASE_URL 必须是用户实际访问的 HTTPS origin（不能带子路径），应用据此校验来源、生成链接并设置 Secure Cookie。应用自身不终止 TLS，不依赖 X-Forwarded-Host 推导分享地址。
+反向代理不要改写或删除 Origin / Referer，否则网页解锁或焚毁确认可能被拒绝。BASE_URL 设置主要公网 HTTPS origin（不能带子路径），用于生成分享链接；其他访问地址显式加入 ALLOWED_ORIGINS。应用自身不终止 TLS，不依赖 X-Forwarded-Host 推导分享地址或允许来源。
+
+### 同时使用公网域名和 Tailnet 地址
+
+更新到支持 ALLOWED_ORIGINS 的版本后，在部署用 `.env` 中配置（将示例主机名替换为浏览器地址栏实际使用的名字）：
+
+```dotenv
+BASE_URL=https://paste.example.com
+ALLOWED_ORIGINS=http://100.64.0.10:8007,http://my-node:8007,http://my-node.tail-example.ts.net:8007
+```
+
+BASE_URL 始终自动允许，无需在列表中重复。短主机名、完整 DNS 名和 IP 是不同 origin；HTTP / HTTPS、不同端口也分别列出。只添加你自己控制且确实提供此应用的地址，不要用通配符。此设置不是 CORS 开关，也不改变 DNS、端口发布或网络访问权限；HTTP 入口只用于受控 Tailnet，公网继续使用 HTTPS。若 Tailnet 已配置 HTTPS，填写真实 HTTPS 地址即可，不要只改协议而不配置 TLS。
+
+```bash
+docker compose up -d --force-recreate rpaste
+docker compose exec rpaste printenv BASE_URL ALLOWED_ORIGINS
+```
+
+镜像必须先更新为包含该功能的版本；本地构建使用 `docker compose up -d --build --force-recreate rpaste`。只 restart 不会应用新的容器环境变量。不同主机名下需要各自输入密码；Tailnet 请求保持相对路径跳转，不会强制跳回公网域名。HTTP Tailnet 解锁不设置 Secure，HTTPS 公网解锁仍设置 Secure。Origin 不在列表、Origin 为 null 或 Sec-Fetch-Site 为 cross-site 仍被拒绝；不要通过删除 Origin 或关闭校验来解决 Invalid。
 
 不要缓存 paste、raw、下载或 API 响应；应用已经发送 `Cache-Control: no-store`。代理的请求体上限至少容纳 JSON 转义后的传输大小及 PDF multipart：默认 JSON 传输上限为 6 MiB + 16 KiB，PDF 为 10 MiB + 16 KiB，代理可设 12 MiB，例如 Nginx 的 `client_max_body_size 12m`，提高 MAX_CONTENT_BYTES 或 PDF 常量时也要同步调整。API_TOKEN 仍只保护 API 创建，不会关闭网页创建或 PDF 上传。
 

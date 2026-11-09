@@ -28,6 +28,7 @@ impl Harness {
             bind_addr: "127.0.0.1:0".parse().expect("address"),
             database_url,
             base_url: "https://paste.example".into(),
+            allowed_origins: Vec::new(),
             max_content_bytes: 1048576,
             database_max_connections: connections,
             cleanup_interval: Duration::from_secs(60),
@@ -673,6 +674,118 @@ async fn failed_delete_never_returns_prepared_content_and_can_be_retried() {
         harness.consume(&id, &token, "", "view").await.status(),
         StatusCode::OK
     );
+}
+
+#[tokio::test]
+async fn alternate_origins_unlock_and_burn_with_transport_appropriate_cookies() {
+    let mut harness = Harness::new().await;
+    let origins = [
+        "https://paste.example",
+        "http://100.64.0.10:8007",
+        "http://my-node:8007",
+        "https://my-node.tail-example.ts.net",
+    ];
+    Arc::make_mut(&mut harness.state.config).allowed_origins = origins[1..]
+        .iter()
+        .map(|origin| (*origin).to_owned())
+        .collect();
+    harness.app = routes::router(harness.state.clone());
+    for origin in origins {
+        let id = harness.create("secret", true).await;
+        let response = harness
+            .request(
+                Method::POST,
+                &format!("/unlock/{id}"),
+                &[("password", "secret")],
+                &[
+                    ("origin", origin),
+                    ("sec-fetch-site", "same-origin"),
+                    ("host", "internal-proxy:3000"),
+                    ("x-forwarded-proto", "http"),
+                ],
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let header = response.headers()["set-cookie"].to_str().expect("cookie");
+        assert_eq!(header.contains("; Secure"), origin.starts_with("https://"));
+        assert!(header.contains("HttpOnly; SameSite=Strict"));
+        assert!(!header.contains("Domain="));
+        let cookie = cookie(&response);
+        let token = harness.confirm_token(&id, &cookie).await;
+        let response = harness
+            .request(
+                Method::POST,
+                &format!("/read/{id}"),
+                &[("token", &token)],
+                &[("origin", origin), ("cookie", &cookie)],
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(text(response).await.contains("private-payload"));
+        assert!(!harness.exists(&id).await);
+    }
+    let fallback = access::cookie(
+        &harness.state,
+        "Ab12Cd34",
+        "token",
+        &axum::http::HeaderMap::new(),
+    )
+    .expect("cookie");
+    assert!(fallback.contains("; Secure"));
+}
+
+#[tokio::test]
+async fn origin_allowlist_does_not_trust_proxy_headers_or_cross_site_forms() {
+    let mut harness = Harness::new().await;
+    Arc::make_mut(&mut harness.state.config).allowed_origins = vec!["http://my-node:8007".into()];
+    harness.app = routes::router(harness.state.clone());
+    let id = harness.create("secret", false).await;
+    for origin in [
+        "https://evil.example",
+        "http://my-node:8008",
+        "https://my-node:8007",
+        "http://my-node:8007.evil.example",
+        "http://my-node:8007/path",
+        "null",
+        "http://my-node:8007 https://paste.example",
+    ] {
+        let response = harness
+            .request(
+                Method::POST,
+                &format!("/unlock/{id}"),
+                &[("password", "secret")],
+                &[
+                    ("origin", origin),
+                    ("host", "my-node:8007"),
+                    ("x-forwarded-host", "my-node:8007"),
+                    ("x-forwarded-proto", "http"),
+                ],
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{origin}");
+        assert!(!response.headers().contains_key("set-cookie"));
+    }
+    let response = harness
+        .request(
+            Method::POST,
+            &format!("/unlock/{id}"),
+            &[("password", "secret")],
+            &[
+                ("origin", "http://my-node:8007"),
+                ("sec-fetch-site", "cross-site"),
+            ],
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let mut headers = axum::http::HeaderMap::new();
+    headers.append("origin", "https://paste.example".parse().expect("origin"));
+    headers.append("origin", "http://my-node:8007".parse().expect("origin"));
+    assert!(access::same_origin(&harness.state, &headers).is_err());
+    let tokens: i64 = sqlx::query_scalar("SELECT count(*) FROM paste_tokens")
+        .fetch_one(&harness.state.pool)
+        .await
+        .expect("tokens");
+    assert_eq!(tokens, 0);
 }
 
 #[tokio::test]

@@ -42,7 +42,7 @@ pub async fn issue(
 }
 
 pub fn cookie_name(id: &str) -> String {
-    format!("rpaste_access_{id}")
+    format!("pastelet_access_{id}")
 }
 
 pub fn cookie(

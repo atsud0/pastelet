@@ -1,6 +1,6 @@
 services:
-  rpaste:
-    image: ${RPASTE_IMAGE:-rpaste:local}
+  pastelet:
+    image: ${PASTELET_IMAGE:-pastelet:local}
     build:
       context: .
     restart: unless-stopped
@@ -8,16 +8,16 @@ services:
       - "${HOST_IP:-127.0.0.1}:${HOST_PORT:-3000}:3000"
     environment:
       BIND_ADDR: 0.0.0.0:3000
-      DATABASE_URL: sqlite:///data/rpaste.db
+      DATABASE_URL: sqlite:///data/pastelet.db
       BASE_URL: ${BASE_URL:-http://localhost:3000}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       MAX_CONTENT_BYTES: ${MAX_CONTENT_BYTES:-1048576}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-5}
       CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-60}
       API_TOKEN: ${API_TOKEN:-}
-      RUST_LOG: ${RUST_LOG:-rpaste=info,tower_http=info}
+      RUST_LOG: ${RUST_LOG:-pastelet=info,tower_http=info}
     volumes:
-      - rpaste-data:/data
+      - pastelet-data:/data
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
@@ -34,4 +34,4 @@ services:
         max-file: "3"
 
 volumes:
-  rpaste-data:
+  pastelet-data:

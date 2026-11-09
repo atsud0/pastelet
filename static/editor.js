@@ -115,7 +115,7 @@ class PasteEditor {
 
 function initializeReader(document) {
   const toggle = document.getElementById("reader-wrap");
-  const source = document.querySelector("#rpaste-source .source-view");
+  const source = document.querySelector("#pastelet-source .source-view");
   if (!toggle || !source) return;
   toggle.checked = source.classList.contains("is-wrapped");
   toggle.addEventListener("change", () => {

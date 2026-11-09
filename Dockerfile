@@ -12,24 +12,24 @@ COPY templates ./templates
 COPY static ./static
 COPY scripts/build-css.sh ./scripts/build-css.sh
 RUN sh scripts/build-css.sh --check \
-    && cargo build --release --locked --bin rpaste
+    && cargo build --release --locked --bin pastelet
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libgcc-s1 curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 10001 rpaste \
-    && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /data --shell /usr/sbin/nologin rpaste \
+    && groupadd --gid 10001 pastelet \
+    && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /data --shell /usr/sbin/nologin pastelet \
     && install -d -o 10001 -g 10001 -m 0700 /data
-COPY --from=builder /build/target/release/rpaste /usr/local/bin/rpaste
+COPY --from=builder /build/target/release/pastelet /usr/local/bin/pastelet
 ENV BIND_ADDR=0.0.0.0:3000 \
-    DATABASE_URL=sqlite:///data/rpaste.db \
+    DATABASE_URL=sqlite:///data/pastelet.db \
     BASE_URL=http://localhost:3000 \
-    RUST_LOG=rpaste=info,tower_http=info
+    RUST_LOG=pastelet=info,tower_http=info
 WORKDIR /data
 USER 10001:10001
 EXPOSE 3000
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl --fail --silent --show-error --connect-timeout 2 --max-time 4 http://127.0.0.1:3000/ > /dev/null || exit 1
-ENTRYPOINT ["/usr/local/bin/rpaste"]
+ENTRYPOINT ["/usr/local/bin/pastelet"]

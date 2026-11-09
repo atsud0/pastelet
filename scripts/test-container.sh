@@ -2,9 +2,9 @@
 set -euo pipefail
 
 engine=${CONTAINER_ENGINE:-docker}
-image=${1:-rpaste:local}
+image=${1:-pastelet:local}
 workspace=$(mktemp -d)
-name="rpaste-smoke-${workspace##*/}"
+name="pastelet-smoke-${workspace##*/}"
 volume="$name-data"
 container_started=false
 volume_created=false

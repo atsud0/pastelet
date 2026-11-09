@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn malicious_markdown_and_html_are_cleaned() {
-        let rendered = markdown("<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[bad](javascript:alert%281%29)\n\n<svg onload=alert(2)></svg><iframe srcdoc=x></iframe>\n\n<a href=\"jav&#x61;script:alert(1)\" onclick=\"alert(1)\">bad</a>\n\n<div id=\"rpaste-source\" class=\"source-view\" style=\"position:fixed\">safe</div>\n\n<input type=\"password\" name=\"password\" autofocus onfocus=\"alert(1)\">\n").expect("markdown");
+        let rendered = markdown("<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[bad](javascript:alert%281%29)\n\n<svg onload=alert(2)></svg><iframe srcdoc=x></iframe>\n\n<a href=\"jav&#x61;script:alert(1)\" onclick=\"alert(1)\">bad</a>\n\n<div id=\"pastelet-source\" class=\"source-view\" style=\"position:fixed\">safe</div>\n\n<input type=\"password\" name=\"password\" autofocus onfocus=\"alert(1)\">\n").expect("markdown");
         for forbidden in [
             "<script",
             "<svg",
@@ -297,7 +297,7 @@ mod tests {
                 "unsafe {forbidden}: {rendered}"
             );
         }
-        assert!(rendered.contains("id=\"md-rpaste-source\""));
+        assert!(rendered.contains("id=\"md-pastelet-source\""));
     }
 
     #[test]

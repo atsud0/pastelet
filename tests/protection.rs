@@ -4,7 +4,7 @@ use axum::{
     http::{Method, Request, StatusCode},
     response::Response,
 };
-use rpaste::{
+use pastelet::{
     AppState,
     config::Config,
     db, routes,
@@ -184,7 +184,7 @@ async fn password_unlock_guards_every_path_and_uses_hashed_expiring_tokens() {
         for headers in [
             vec![],
             vec![("x-paste-password", "wrong")],
-            vec![("cookie", "rpaste_access_fake=fake")],
+            vec![("cookie", "pastelet_access_fake=fake")],
         ] {
             let response = harness.request(Method::GET, &path, &[], &headers).await;
             assert_eq!(response.status(), StatusCode::UNAUTHORIZED);

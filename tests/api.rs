@@ -6,7 +6,7 @@ use axum::{
     http::{Method, Request, StatusCode},
     response::Response,
 };
-use rpaste::{
+use pastelet::{
     AppState,
     config::Config,
     db, routes,

@@ -47,7 +47,7 @@ impl Config {
                 key: "BIND_ADDR",
                 reason: "must be an IP address and port",
             })?;
-        let database_url = value("DATABASE_URL", "sqlite://data/rpaste.db")?;
+        let database_url = value("DATABASE_URL", "sqlite://data/pastelet.db")?;
         if !database_url.starts_with("sqlite:") {
             return Err(ConfigError {
                 key: "DATABASE_URL",
@@ -103,7 +103,7 @@ impl Config {
             database_max_connections,
             cleanup_interval: Duration::from_secs(cleanup_seconds),
             api_token,
-            rust_log: value("RUST_LOG", "rpaste=info,tower_http=info")?,
+            rust_log: value("RUST_LOG", "pastelet=info,tower_http=info")?,
         })
     }
 }

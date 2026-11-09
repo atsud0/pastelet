@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} · rpaste{% endblock %}
+{% block title %}{{ title }} · Pastelet{% endblock %}
 {% block extra_scripts %}{% if is_pdf %}<script src="/static/pdf-viewer.mjs" type="module"></script>{% endif %}{% endblock %}
 {% block toolbar_class %}reader-toolbar{% endblock %}
 {% block toolbar_title %}<h1 title="{{ title }}">{{ title }}</h1>{% endblock %}
@@ -8,7 +8,7 @@
     <button id="reader-menu-toggle" class="icon-button" type="button" aria-label="更多操作" title="更多操作" aria-expanded="false" aria-controls="reader-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
     <nav id="reader-menu" class="reader-menu actions" aria-label="Paste" hidden>
     {% if is_markdown %}
-    <button id="view-toggle" type="button" aria-label="Source" title="Source" aria-pressed="false" aria-controls="rpaste-source rpaste-rendered">
+    <button id="view-toggle" type="button" aria-label="Source" title="Source" aria-pressed="false" aria-controls="pastelet-source pastelet-rendered">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/></svg>
     </button>
     {% endif %}
@@ -52,11 +52,11 @@
 </section>
 {% else %}
 {% if is_markdown %}
-<article id="rpaste-rendered" class="markdown editor-card" hx-disable>{{ markdown_html|safe }}</article>
+<article id="pastelet-rendered" class="markdown editor-card" hx-disable>{{ markdown_html|safe }}</article>
 {% endif %}
-<section id="rpaste-source" class="reader-source" aria-label="{{ language }}"{% if is_markdown %} hidden{% endif %} hx-disable>
+<section id="pastelet-source" class="reader-source" aria-label="{{ language }}"{% if is_markdown %} hidden{% endif %} hx-disable>
   {{ source_html|safe }}
-  <label class="reader-wrap"><input id="reader-wrap" type="checkbox" role="switch" aria-label="换行" aria-controls="rpaste-source"{% if language == "text" %} checked{% endif %}>换行</label>
+  <label class="reader-wrap"><input id="reader-wrap" type="checkbox" role="switch" aria-label="换行" aria-controls="pastelet-source"{% if language == "text" %} checked{% endif %}>换行</label>
 </section>
 <p id="action-feedback" class="sr-only" role="status" aria-live="polite"></p>
 {% endif %}

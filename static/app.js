@@ -1,7 +1,7 @@
 (() => {
   let theme = "system";
   try {
-    const saved = localStorage.getItem("rpaste-theme");
+    const saved = localStorage.getItem("pastelet-theme");
     if (["light", "dark"].includes(saved)) theme = saved;
   } catch {}
   document.documentElement.dataset.theme = theme;
@@ -18,7 +18,7 @@ function initialize() {
   };
   themeButtons.forEach(button => button.addEventListener("click", () => {
     theme = button.dataset.themeChoice;
-    try { localStorage.setItem("rpaste-theme", theme); } catch {}
+    try { localStorage.setItem("pastelet-theme", theme); } catch {}
     updateTheme();
   }));
   updateTheme();
@@ -57,8 +57,8 @@ function initialize() {
   });
 
   const toggle = document.getElementById("view-toggle");
-  const source = document.getElementById("rpaste-source");
-  const rendered = document.getElementById("rpaste-rendered");
+  const source = document.getElementById("pastelet-source");
+  const rendered = document.getElementById("pastelet-rendered");
   if (!toggle || !source || !rendered) return;
 
   const showSource = enabled => {

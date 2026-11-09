@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
-use rpaste::{
+use pastelet::{
     AppState,
     config::Config,
     db, routes,
@@ -185,7 +185,7 @@ async fn pdf_round_trip_headers_title_and_no_text_operations() {
     for hidden in [
         "copy-paste",
         "view-toggle",
-        "rpaste-source",
+        "pastelet-source",
         "aria-label=\"Fork\"",
     ] {
         assert!(!html.contains(hidden));

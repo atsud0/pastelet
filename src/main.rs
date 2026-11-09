@@ -1,4 +1,4 @@
-use rpaste::{AppState, config::Config, db, routes, services::cleanup};
+use pastelet::{AppState, config::Config, db, routes, services::cleanup};
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 

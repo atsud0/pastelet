@@ -7,7 +7,7 @@ use axum::{
     response::Response,
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
-use rpaste::{AppState, config::Config, db, models::Paste, routes, services::paste::valid_id};
+use pastelet::{AppState, config::Config, db, models::Paste, routes, services::paste::valid_id};
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
@@ -27,7 +27,7 @@ impl Harness {
             database_max_connections: 1,
             cleanup_interval: Duration::from_secs(60),
             api_token: None,
-            rust_log: "rpaste=info".into(),
+            rust_log: "pastelet=info".into(),
         };
         let pool = db::connect(&config).await.expect("database");
         let app = routes::router(AppState {
@@ -223,7 +223,7 @@ async fn browser_gate_templates_never_return_or_delete_protected_content() {
             let response = harness.browser(Method::GET, &path, "", false).await;
             assert_eq!(response.status(), status);
             let body = text(response).await;
-            assert!(body.contains(&format!("<title>{label} · rpaste</title>")));
+            assert!(body.contains(&format!("<title>{label} · Pastelet</title>")));
             assert!(body.contains("type=\"submit\""));
             assert!(!body.contains("private-payload"));
             assert!(!body.contains("private-title"));
@@ -349,10 +349,10 @@ async fn editor_and_reader_share_home_link_header_and_code_metrics() {
         assert!(html.contains("<header class=\"site-toolbar"));
         assert!(html.contains("<main class=\"site-main"));
         assert_eq!(html.matches("id=\"theme-picker\"").count(), 1);
-        assert!(!html.contains("rpaste<span"));
+        assert!(!html.contains("pastelet<span"));
     }
-    assert!(create.contains("<title>rpaste</title>"));
-    assert!(read.contains("<title>Header alignment · rpaste</title>"));
+    assert!(create.contains("<title>Pastelet</title>"));
+    assert!(read.contains("<title>Header alignment · Pastelet</title>"));
     assert!(create.contains("class=\"language-group\""));
     assert!(create.contains("id=\"editor-active-line\""));
     assert!(read.contains("class=\"toolbar-actions\""));
@@ -476,7 +476,7 @@ async fn create_view_raw_download_and_copy_preserve_original_content() {
     assert!(html.contains("syn-storage"));
     assert!(html.contains("id=\"L2\" href=\"#L2\""));
     assert!(!html.contains("<img src=x onerror="));
-    assert!(!html.contains("id=\"rpaste-rendered\""));
+    assert!(!html.contains("id=\"pastelet-rendered\""));
     let encoded = html
         .split("data-raw=\"")
         .nth(1)

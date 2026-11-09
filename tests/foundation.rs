@@ -5,7 +5,7 @@ use axum::{
     http::{Request, StatusCode},
     response::IntoResponse,
 };
-use rpaste::{AppState, config::Config, db, error::AppError, models::Paste, routes};
+use pastelet::{AppState, config::Config, db, error::AppError, models::Paste, routes};
 use tower::ServiceExt;
 
 fn config(database_url: String) -> Config {
@@ -18,7 +18,7 @@ fn config(database_url: String) -> Config {
         database_max_connections: 2,
         cleanup_interval: Duration::from_secs(60),
         api_token: None,
-        rust_log: "rpaste=info".into(),
+        rust_log: "pastelet=info".into(),
     }
 }
 
@@ -75,7 +75,7 @@ async fn schema_rejects_invalid_records() {
 
 #[tokio::test]
 async fn upgrade_preserves_legacy_content_tokens_and_pdf_with_foreign_keys_enabled() {
-    use rpaste::services::{access, password};
+    use pastelet::services::{access, password};
     let directory = tempfile::tempdir().expect("directory");
     let migrations = directory.path().join("migrations");
     std::fs::create_dir(&migrations).expect("migrations directory");
@@ -210,7 +210,7 @@ async fn upgrade_preserves_legacy_content_tokens_and_pdf_with_foreign_keys_enabl
         .oneshot(
             Request::builder()
                 .uri("/raw/OldText1")
-                .header("cookie", format!("rpaste_access_OldText1={access_token}"))
+                .header("cookie", format!("pastelet_access_OldText1={access_token}"))
                 .body(Body::empty())
                 .expect("request"),
         )

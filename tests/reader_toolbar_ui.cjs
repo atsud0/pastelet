@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { runInNewContext } = require("node:vm");
 
-function harness(width, pdf = false) {
+function harness(width, pdf = false, burned = false) {
   const elements = {};
   const document = {
     documentElement: { dataset: {} }, listeners: {}, activeElement: null,
@@ -38,6 +38,7 @@ function harness(width, pdf = false) {
   const fork = element("fork", true);
   const theme = element("theme");
   theme.append(element("system", true), element("light", true), element("dark", true));
+  if (!burned) menu.append(element("copy-share-link", true));
   menu.append(source, copy, raw, download, fork, theme);
   if (pdf) {
     for (const control of [source, copy, raw, fork]) control.remove();
@@ -63,18 +64,20 @@ test("desktop exposes copy/download/theme while keeping uncommon actions in drop
   assert.equal(copy.parent, tools);
   assert.equal(download.parent, tools);
   assert.equal(theme.parent, tools);
-  assert.deepEqual(menu.children.map(child => child.id), ["source", "raw", "fork"]);
+  assert.deepEqual(menu.children.map(child => child.id), ["copy-share-link", "source", "raw", "fork"]);
 });
 
-test("PDF has no copy or empty desktop menu, while mobile keeps download and theme", () => {
+test("live PDF keeps share in the menu on both layouts without offering text copy", () => {
   const { toggle, menu, download, theme, media } = harness(1440, true);
-  assert.equal(toggle.hidden, true);
+  assert.equal(toggle.hidden, false);
+  assert.deepEqual(menu.children.map(child => child.id), ["copy-share-link"]);
   media.matches = true;
   media.change();
   assert.equal(toggle.hidden, false);
   assert.equal(download.parent, menu);
   assert.equal(theme.parent, menu);
-  assert.equal(menu.children.length, 2);
+  assert.deepEqual(menu.children.map(child => child.id), ["download", "copy-share-link", "theme"]);
+  assert.equal(harness(1440, true, true).toggle.hidden, true);
 });
 
 test("mobile keeps only overflow trigger and reuses original action elements", () => {
@@ -98,17 +101,19 @@ test("keyboard arrows, Home/End and Escape navigate and restore focus", () => {
   const { toggle, menu, document, elements, key } = harness(900);
   assert.equal(key(toggle, "ArrowDown").prevented, true);
   assert.equal(menu.hidden, false);
+  assert.equal(document.activeElement, elements["copy-share-link"]);
+  key(menu, "ArrowDown");
   assert.equal(document.activeElement, elements.source);
   key(menu, "ArrowDown");
   assert.equal(document.activeElement, elements.raw);
   key(menu, "End");
   assert.equal(document.activeElement, elements.fork);
   key(menu, "ArrowDown");
-  assert.equal(document.activeElement, elements.source);
+  assert.equal(document.activeElement, elements["copy-share-link"]);
   key(menu, "ArrowUp");
   assert.equal(document.activeElement, elements.fork);
   key(menu, "Home");
-  assert.equal(document.activeElement, elements.source);
+  assert.equal(document.activeElement, elements["copy-share-link"]);
   key(menu, "Escape");
   assert.equal(menu.hidden, true);
   assert.equal(document.activeElement, toggle);

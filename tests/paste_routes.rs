@@ -356,6 +356,15 @@ async fn editor_and_reader_share_home_link_header_and_code_metrics() {
     assert!(create.contains("class=\"language-group\""));
     assert!(create.contains("id=\"editor-active-line\""));
     assert!(read.contains("class=\"toolbar-actions\""));
+    let menu = read
+        .split("id=\"reader-menu\"")
+        .nth(1)
+        .expect("reader menu")
+        .split("</nav>")
+        .next()
+        .expect("menu items");
+    assert!(menu.contains(&format!("data-share-url=\"http://localhost:3000/{id}\"")));
+    assert!(menu.contains("id=\"copy-paste\""));
     let header_end = read.find("</header>").expect("header end");
     for control in [
         "copy-paste",

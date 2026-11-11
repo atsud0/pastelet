@@ -54,6 +54,7 @@ struct ErrorTemplate {
 #[template(path = "unlock.html")]
 struct UnlockTemplate<'a> {
     id: &'a str,
+    share_url: String,
     target: &'a str,
     error: &'a str,
 }
@@ -62,6 +63,7 @@ struct UnlockTemplate<'a> {
 #[template(path = "confirm.html")]
 struct ConfirmTemplate<'a> {
     id: &'a str,
+    share_url: String,
     target: &'a str,
     token: &'a str,
 }
@@ -105,12 +107,18 @@ pub fn error_response(status: StatusCode) -> Response {
     }
 }
 
-pub fn unlock_page(id: &str, target: ReadTarget, error: &str) -> Result<Response, AppError> {
+pub fn unlock_page(
+    state: &AppState,
+    id: &str,
+    target: ReadTarget,
+    error: &str,
+) -> Result<Response, AppError> {
     Ok((
         StatusCode::UNAUTHORIZED,
         Html(
             UnlockTemplate {
                 id,
+                share_url: state.config.share_url(id),
                 target: target.key(),
                 error,
             }
@@ -129,7 +137,7 @@ pub async fn gate(
     let metadata = paste::metadata(state, id).await?;
     if !access::authorized(state, &metadata, headers).await? {
         if wants_html(headers) {
-            return Ok(PageAccess::Prompt(unlock_page(id, target, "")?));
+            return Ok(PageAccess::Prompt(unlock_page(state, id, target, "")?));
         }
         return Err(AppError::Unauthorized);
     }
@@ -142,6 +150,7 @@ pub async fn gate(
             Html(
                 ConfirmTemplate {
                     id,
+                    share_url: state.config.share_url(id),
                     target: target.key(),
                     token: &token,
                 }

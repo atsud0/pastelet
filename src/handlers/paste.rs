@@ -38,6 +38,7 @@ struct CreateTemplate {
 #[derive(Template)]
 #[template(path = "view.html")]
 struct ViewTemplate {
+    share_url: String,
     is_pdf: bool,
     pdf_base64: String,
     download_name: String,
@@ -170,6 +171,7 @@ pub async fn view(
 }
 
 async fn view_response(state: &AppState, paste: Paste) -> Result<Response, AppError> {
+    let share_url = state.config.share_url(&paste.id);
     let is_pdf = paste.language == crate::services::pdf::PDF_LANGUAGE;
     let pdf_base64 = if is_pdf {
         STANDARD.encode(crate::services::pdf::data(state, &paste.id).await?)
@@ -195,6 +197,7 @@ async fn view_response(state: &AppState, paste: Paste) -> Result<Response, AppEr
         };
         Ok(Html(
             ViewTemplate {
+                share_url,
                 is_pdf,
                 pdf_base64,
                 download_name,
@@ -328,7 +331,7 @@ pub async fn unlock(
         && !password::verify(input.password, hash.clone()).await?
     {
         if pages::wants_html(&headers) {
-            return pages::unlock_page(&id, input.target, "Incorrect password");
+            return pages::unlock_page(&state, &id, input.target, "Incorrect password");
         }
         return Err(AppError::Unauthorized);
     }

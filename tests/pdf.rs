@@ -181,6 +181,7 @@ async fn pdf_round_trip_headers_title_and_no_text_operations() {
     let html = String::from_utf8(bytes(harness.get(&format!("/{id}"), "", true).await).await)
         .expect("HTML");
     assert!(html.contains("id=\"pdf-viewer\""));
+    assert!(html.contains(&format!("data-share-url=\"https://paste.example/{id}\"")));
     assert!(html.contains(&STANDARD.encode(PDF)));
     for hidden in [
         "copy-paste",
@@ -311,6 +312,7 @@ async fn password_guards_every_pdf_path_before_burning_and_snapshot_survives_del
     assert_eq!(response.status(), StatusCode::OK);
     let html = String::from_utf8(bytes(response).await).expect("HTML");
     assert!(html.contains("data-burned=\"true\""));
+    assert!(!html.contains("data-share-url="));
     assert!(html.contains(&STANDARD.encode(PDF)));
     assert_eq!(harness.stored().await, 0);
     assert_eq!(

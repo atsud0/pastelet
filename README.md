@@ -13,6 +13,7 @@ It is built for a homelab, a Tailscale network, or a small team server: one proc
 ## Why it is useful
 
 ### Link-only sharing
+- Choose **⋯ → 复制链接 (Copy link)** in the reader, or use the link icon on the unlock or burn confirmation page. It copies the canonical `BASE_URL/{id}`, even on a Tailnet host. Copying does not unlock, read or burn a paste. The action is absent from already-burned snapshots; copying the original text is a separate action.
 - Create a paste from the web page or the API and get a URL. No sign-up, no dashboard, no listing endpoint, and `X-Robots-Tag: noindex` on every response.
 - New IDs are 22-character Base62 strings generated from the OS secure random source (about 131 bits of entropy). Legacy 8-character links remain valid and readable.
 

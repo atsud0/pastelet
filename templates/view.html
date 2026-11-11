@@ -7,6 +7,7 @@
   <div id="reader-tools" class="reader-tools">
     <button id="reader-menu-toggle" class="icon-button" type="button" aria-label="更多操作" title="更多操作" aria-expanded="false" aria-controls="reader-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
     <nav id="reader-menu" class="reader-menu actions" aria-label="Paste" hidden>
+    {% if !burned %}{% include "share-button.html" %}{% endif %}
     {% if is_markdown %}
     <button id="view-toggle" type="button" aria-label="Source" title="Source" aria-pressed="false" aria-controls="pastelet-source pastelet-rendered">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/></svg>

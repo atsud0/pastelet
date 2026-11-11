@@ -23,6 +23,7 @@ function initialize() {
   }));
   updateTheme();
   initializeCreateForm();
+  initializeShareLink(document, window);
   initializeReaderMenu(document, window);
   for (const event of ["htmx:sendError", "htmx:timeout"]) {
     document.body.addEventListener(event, () => {
@@ -78,6 +79,51 @@ function initialize() {
   toggle.addEventListener("click", () => showSource(source.hidden));
   window.addEventListener("hashchange", followLineAnchor);
   followLineAnchor();
+}
+
+function initializeShareLink(document, window) {
+  const button = document.getElementById("copy-share-link");
+  if (!button) return;
+  const url = button.dataset.shareUrl;
+  const feedback = document.createElement("div");
+  feedback.className = "share-feedback";
+  feedback.setAttribute("role", "status");
+  document.body.append(feedback);
+  let timer;
+  button.hidden = false;
+  button.addEventListener("click", async () => {
+    let copied = false;
+    if (window.navigator.clipboard?.writeText) {
+      try {
+        await window.navigator.clipboard.writeText(url);
+        copied = true;
+      } catch {}
+    }
+    if (!copied) {
+      const field = document.createElement("input");
+      field.className = "sr-only";
+      field.readOnly = true;
+      field.value = url;
+      const previous = document.activeElement;
+      document.body.append(field);
+      try {
+        field.focus({ preventScroll: true });
+        field.select();
+        copied = document.execCommand("copy");
+      } catch {} finally {
+        field.remove();
+        previous?.focus({ preventScroll: true });
+      }
+    }
+    window.clearTimeout(timer);
+    if (copied) {
+      feedback.textContent = "链接已复制";
+      timer = window.setTimeout(() => { feedback.textContent = ""; }, 1800);
+    } else {
+      feedback.textContent = "";
+      window.prompt("请手动复制链接", url);
+    }
+  });
 }
 
 function initializeReaderMenu(document, window) {

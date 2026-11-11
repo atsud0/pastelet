@@ -24,6 +24,10 @@ pub struct ConfigError {
 }
 
 impl Config {
+    pub fn share_url(&self, id: &str) -> String {
+        format!("{}/{id}", self.base_url)
+    }
+
     pub fn from_env() -> Result<Self, ConfigError> {
         Self::from_lookup(|key| match env::var(key) {
             Ok(value) => Ok(Some(value)),

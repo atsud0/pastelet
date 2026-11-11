@@ -166,6 +166,62 @@ fn cookie(response: &Response) -> String {
 }
 
 #[tokio::test]
+async fn share_links_on_gate_pages_use_the_canonical_view_url_without_consuming() {
+    let harness = Harness::new().await;
+    let id = harness.create("keep-private", true).await;
+    let expected = format!("data-share-url=\"https://paste.example/{id}\"");
+    let path = format!("/download/{id}?unused=private-query");
+    let headers = [
+        ("accept", "text/html"),
+        ("host", "tailnet-node:8007"),
+        ("x-forwarded-host", "untrusted.example"),
+    ];
+    let response = harness.request(Method::GET, &path, &[], &headers).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(!response.headers().contains_key("set-cookie"));
+    let locked = text(response).await;
+    let wrong = text(harness.unlock(&id, "not-the-password", "raw").await).await;
+    assert!(wrong.contains("Incorrect password"));
+    let unlocked = harness.unlock(&id, "keep-private", "download").await;
+    let cookie = cookie(&unlocked);
+    let mut headers = headers.to_vec();
+    headers.push(("cookie", &cookie));
+    let confirmation = text(harness.request(Method::GET, &path, &[], &headers).await).await;
+    for page in [&locked, &wrong, &confirmation] {
+        assert_eq!(page.matches(&expected).count(), 1);
+        assert!(page.contains("<button type=\"button\" id=\"copy-share-link\""));
+        assert!(
+            page.find("id=\"copy-share-link\"").expect("copy button")
+                < page.find("<form ").expect("gate form")
+        );
+        for private in [
+            "private-payload",
+            "Secret title",
+            "keep-private",
+            "private-query",
+            "tailnet-node:8007",
+            "untrusted.example",
+            "data-raw=",
+        ] {
+            assert!(!page.contains(private));
+        }
+    }
+    assert!(harness.exists(&id).await);
+    let token = confirmation
+        .split("name=\"token\" value=\"")
+        .nth(1)
+        .expect("confirmation token")
+        .split('"')
+        .next()
+        .expect("token value");
+    let snapshot = text(harness.consume(&id, token, &cookie, "view").await).await;
+    assert!(snapshot.contains("private-payload"));
+    assert!(snapshot.contains("id=\"copy-paste\""));
+    assert!(!snapshot.contains("data-share-url="));
+    assert!(!harness.exists(&id).await);
+}
+
+#[tokio::test]
 async fn password_unlock_guards_every_path_and_uses_hashed_expiring_tokens() {
     let harness = Harness::new().await;
     let id = harness.create("correct horse", false).await;

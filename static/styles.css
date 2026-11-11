@@ -206,6 +206,7 @@
   .toolbar-title:not(:empty) { border-left: 1px solid var(--line); padding-left: var(--toolbar-gap); }
   .toolbar-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; font-weight: 600; }
   .toolbar-actions { flex-shrink: 0; display: flex; align-items: center; gap: var(--action-gap); }
+  .share-feedback:not(:empty) { position: fixed; z-index: 35; top: calc(var(--toolbar-height) + .5rem); right: var(--page-gutter); border: 1px solid var(--line); border-radius: .5rem; padding: .4rem .75rem; background: var(--surface); color: var(--ink); font-size: .8125rem; pointer-events: none; }
   .reader-tools { position: relative; display: flex; align-items: center; gap: var(--action-gap); }
   .reader-tools > :is(a, button) { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: .5rem; color: var(--muted); }
   .reader-tools > :is(a, button):hover { background: var(--control-hover); color: var(--ink); }

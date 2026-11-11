@@ -142,7 +142,7 @@ pub async fn create(
             }
         })?;
     let paste = paste::create(&state, parse_input(plain, &uri, &body)?).await?;
-    let url = format!("{}/{}", state.config.base_url, paste.id);
+    let url = state.config.share_url(&paste.id);
     let result = CreatedPaste {
         raw_url: format!("{}/raw/{}", state.config.base_url, paste.id),
         id: paste.id,
